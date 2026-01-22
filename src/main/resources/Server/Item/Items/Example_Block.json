@@ -33,7 +33,10 @@
       "Stone",
       "Lava",
       "Dirt"
-    ]
+    ],
+    "Interactions": {
+      "CollisionEnter": "RailBoostRoot"
+    }
   },
   "Tags": {
     "Type": [
