@@ -16,9 +16,11 @@ import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.toeshi.rail.RailPlugin;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -29,7 +31,9 @@ public class MinecartBoostSystem extends EntityTickingSystem<EntityStore> {
   private final Query<EntityStore> query =
       Query.or(MountedComponent.getComponentType());
   private final Set<Dependency<EntityStore>> deps = Set.of(
-      new SystemDependency<>(Order.AFTER, MountSystems.HandleMountInput.class));
+      new SystemDependency<>(Order.AFTER, MountSystems.HandleMountInput.class),
+      new SystemDependency<>(Order.AFTER,
+                             PlayerSystems.ProcessPlayerInput.class));
 
   private static final Map<Ref<EntityStore>, Vector3d> lastPosition =
       new HashMap<>();
@@ -45,43 +49,34 @@ public class MinecartBoostSystem extends EntityTickingSystem<EntityStore> {
                    @Nonnull ArchetypeChunk<EntityStore> chunk,
                    @Nonnull Store<EntityStore> store,
                    @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-
     World world = ((EntityStore)store.getExternalData()).getWorld();
-
     MountedComponent mounted =
         chunk.getComponent(index, MountedComponent.getComponentType());
-
     if (mounted == null ||
         mounted.getControllerType() != MountController.Minecart) {
       return;
     }
-
     Ref<EntityStore> minecartRef = mounted.getMountedToEntity();
-    TransformComponent transform = commandBuffer.getComponent(
-        minecartRef, TransformComponent.getComponentType());
 
-    if (transform == null) {
+    // Get transform FIRST just to get position for block checking
+    TransformComponent transformTemp = commandBuffer.getComponent(
+        minecartRef, TransformComponent.getComponentType());
+    if (transformTemp == null) {
       return;
     }
-
-    Vector3d position = transform.getPosition();
+    Vector3d position = transformTemp.getPosition().clone(); // Clone it!
 
     // Check block below minecart
     int blockX = (int)Math.floor(position.x);
     int blockY = (int)Math.floor(position.y - 1);
     int blockZ = (int)Math.floor(position.z);
-
     long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
     WorldChunk worldChunk = world.getChunkIfInMemory(chunkIndex);
-
     if (worldChunk == null) {
       return;
     }
-
     BlockType blockType = worldChunk.getBlockType(blockX, blockY, blockZ);
-
     if (blockType == null || !blockType.getId().equals("Example_Block")) {
-      // Track last position for direction
       lastPosition.put(minecartRef, position.clone());
       return;
     }
@@ -89,20 +84,24 @@ public class MinecartBoostSystem extends EntityTickingSystem<EntityStore> {
     // Debounce
     long currentTime = System.currentTimeMillis();
     Long lastBoost = lastBoostTime.get(minecartRef);
-
     if (lastBoost != null && (currentTime - lastBoost) < BOOST_COOLDOWN_MS) {
+      return;
+    }
+
+    // Get transform AGAIN after all the world checks
+    TransformComponent transform = commandBuffer.getComponent(
+        minecartRef, TransformComponent.getComponentType());
+    if (transform == null) {
       return;
     }
 
     // Calculate direction
     Vector3d lastPos = lastPosition.get(minecartRef);
     Vector3d direction;
-
     if (lastPos != null) {
       direction =
           new Vector3d(position.x - lastPos.x, 0, position.z - lastPos.z);
       double speed = direction.length();
-
       if (speed > 0.001) {
         direction.normalize();
       } else {
@@ -111,12 +110,22 @@ public class MinecartBoostSystem extends EntityTickingSystem<EntityStore> {
     } else {
       direction = new Vector3d(0, 0, 1);
     }
+    direction.scale(BOOST_AMOUNT * 3);
 
-    direction.scale(BOOST_AMOUNT);
-    // Why is this not working :(
-    position.add(direction);
+    RailPlugin.LOGGER.atInfo().log("Boosting %s for transform %s", direction,
+                                   position);
+
+    Vector3d newPosition = transform.getPosition().clone();
+    newPosition.add(direction);
+    transform.setPosition(newPosition);
+
+    RailPlugin.LOGGER.atInfo().log("Boosted %s now at transform %s", direction,
+                                   newPosition);
+    Vector3d actualPosition = transform.getPosition();
+    RailPlugin.LOGGER.atInfo().log("Transform %s", actualPosition);
 
     lastBoostTime.put(minecartRef, currentTime);
+    lastPosition.put(minecartRef, newPosition.clone());
 
     // Cleanup
     if (lastPosition.size() > 100) {
