@@ -8,6 +8,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.component.PhysicsValues;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
@@ -60,16 +61,6 @@ public class MinecartPhysicsSystem extends EntityTickingSystem<EntityStore> {
 
     cartTransform.getPosition().assign(stateAfter.position);
     velocity.set(stateAfter.velocity);
-
-    BetterRailsRiddenComponent ridden = chunk.getComponent(
-        index, BetterRailsRiddenComponent.getComponentType());
-
-    if (ridden == null) {
-      return;
-    }
-
-
-    Ref<EntityStore> playerRef = ridden.getRiderRef();
   }
 
   @Nonnull

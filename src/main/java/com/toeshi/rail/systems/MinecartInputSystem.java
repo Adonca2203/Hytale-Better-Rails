@@ -22,7 +22,7 @@ import java.util.Set;
 import org.jspecify.annotations.NonNull;
 
 public class MinecartInputSystem extends EntityTickingSystem<EntityStore> {
-  private static final double ACCELERATION_FORCE = 25.0;
+  private static final double ACCELERATION_FORCE = 40.0;
   private final Query<EntityStore> query =
       Query.and(BetterRailsRiderComponent.getComponentType(),
                 PlayerInput.getComponentType());
@@ -88,16 +88,6 @@ public class MinecartInputSystem extends EntityTickingSystem<EntityStore> {
         inputDirection.add(rel.getX(), 0, rel.getZ());
       } else if (update instanceof PlayerInput.WishMovement wish) {
         inputDirection.add(wish.getX(), 0, wish.getZ());
-      } else if (update instanceof PlayerInput.SetClientVelocity clientVel) {
-        Vector3d vel = clientVel.getVelocity();
-        inputDirection.add(vel.x * dt, 0, vel.z * dt);
-      } else if (update instanceof PlayerInput.SetBody body) {
-        body.apply(commandBuffer, chunk, index);
-        transform.getRotation().assign(body.direction().pitch,
-                                       body.direction().yaw,
-                                       body.direction().roll);
-      } else if (update instanceof PlayerInput.SetHead head) {
-        head.apply(commandBuffer, chunk, index);
       }
     }
 
